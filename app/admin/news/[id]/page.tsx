@@ -12,7 +12,7 @@ import {
 } from "@/lib/admin-news-service";
 import { ArrowRight } from "lucide-react";
 import { NewsForm } from "./news-form";
-import { AdminClient } from "../admin-client";
+import { AdminClient } from "../../admin-client";
 
 interface PageProps {
   params: Promise<{ id: string }>;
