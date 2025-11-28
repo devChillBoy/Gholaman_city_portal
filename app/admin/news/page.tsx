@@ -70,7 +70,7 @@ export default async function AdminNewsPage() {
           <CardContent>
             {items.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
-                خبری یافت نشد. برای ایجاد خبر جدید، روی دکمه "ایجاد خبر جدید" کلیک کنید.
+                خبری یافت نشد. برای ایجاد خبر جدید، روی دکمه «ایجاد خبر جدید» کلیک کنید.
               </div>
             ) : (
               <Table>
