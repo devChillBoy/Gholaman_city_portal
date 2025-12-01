@@ -1,5 +1,6 @@
-import { getSupabaseClient } from "./supabaseClient";
-import { requireAdmin } from "./server-auth";
+import { createServerSupabaseClient } from "./supabase-server";
+import { requireAdmin, type AuthenticatedContext } from "./server-auth";
+import { newsLogger } from "./logger";
 import type { NewsItem, NewsInput, NewsStatus } from "./types";
 
 // Re-export types for convenience (AdminNewsItem is the same as NewsItem)
@@ -11,7 +12,7 @@ export type AdminNewsItem = NewsItem;
  * @returns Array of all news items
  */
 export async function getAdminNewsList(): Promise<AdminNewsItem[]> {
-  const supabase = getSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   const { data, error } = await supabase
     .from("news")
@@ -31,7 +32,7 @@ export async function getAdminNewsList(): Promise<AdminNewsItem[]> {
  * @returns AdminNewsItem if found, null otherwise
  */
 export async function getAdminNewsById(id: number): Promise<AdminNewsItem | null> {
-  const supabase = getSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   const { data, error } = await supabase
     .from("news")
@@ -53,10 +54,16 @@ export async function getAdminNewsById(id: number): Promise<AdminNewsItem | null
  * @throws Error if user is not authenticated or not an admin
  */
 export async function createNews(input: NewsInput): Promise<AdminNewsItem> {
-  // Require admin authentication
-  await requireAdmin();
-  
-  const supabase = getSupabaseClient();
+  // Require admin authentication - use the returned client for session consistency
+  const { supabase, user } = await requireAdmin();
+
+  // Debug: Log session state before create
+  const { data: sessionData } = await supabase.auth.getSession();
+  newsLogger.debug("Session state before create", {
+    hasSession: !!sessionData?.session,
+    sessionUserId: sessionData?.session?.user?.id || null,
+    authUserId: user.id,
+  });
 
   const insertData: Record<string, unknown> = {
     title: input.title,
@@ -80,7 +87,13 @@ export async function createNews(input: NewsInput): Promise<AdminNewsItem> {
     .single();
 
   if (error) {
-    throw new Error("Failed to create news");
+    newsLogger.error("Supabase create error", error, {
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      message: error.message,
+    });
+    throw new Error(`خطا در ایجاد خبر: ${error.message}`);
   }
 
   return data as AdminNewsItem;
@@ -97,10 +110,8 @@ export async function updateNews(
   id: number,
   input: Partial<NewsInput>
 ): Promise<AdminNewsItem> {
-  // Require admin authentication
-  await requireAdmin();
-  
-  const supabase = getSupabaseClient();
+  // Require admin authentication - use the returned client for session consistency
+  const { supabase } = await requireAdmin();
 
   const updateData: Record<string, unknown> = {};
 
@@ -126,8 +137,9 @@ export async function updateNews(
     updateData.published_at = input.published_at;
   }
 
-  // If status is updated to "published" and published_at is null, set it to now()
-  if (updateData.status === "published" && updateData.published_at === null) {
+  // If status is changed to "published" and published_at was not explicitly provided,
+  // automatically set it to the current timestamp
+  if (updateData.status === "published" && input.published_at === undefined) {
     updateData.published_at = new Date().toISOString();
   }
 
@@ -139,7 +151,14 @@ export async function updateNews(
     .single();
 
   if (error) {
-    throw new Error("Failed to update news");
+    newsLogger.error("Supabase update error", error, {
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      message: error.message,
+      newsId: id,
+    });
+    throw new Error(`خطا در ویرایش خبر: ${error.message}`);
   }
 
   return data as AdminNewsItem;
@@ -151,15 +170,87 @@ export async function updateNews(
  * @throws Error if user is not authenticated or not an admin
  */
 export async function deleteNews(id: number): Promise<void> {
-  // Require admin authentication
-  await requireAdmin();
-  
-  const supabase = getSupabaseClient();
+  // Require admin authentication - use the returned client for session consistency
+  const { supabase, user } = await requireAdmin();
 
-  const { error } = await supabase.from("news").delete().eq("id", id);
+  // Debug: Log session state before delete
+  const { data: sessionData } = await supabase.auth.getSession();
+  newsLogger.debug("Session state before delete", {
+    newsId: id,
+    hasSession: !!sessionData?.session,
+    sessionUserId: sessionData?.session?.user?.id || null,
+    sessionUserEmail: sessionData?.session?.user?.email || null,
+    authUserId: user.id,
+    authUserEmail: user.email,
+    accessToken: sessionData?.session?.access_token ? "present" : "missing",
+  });
+
+  // Try to check what role Supabase sees (requires running 004_rls_diagnostic.sql first)
+  const { data: authStatus, error: authStatusError } = await supabase
+    .rpc('check_auth_status')
+    .maybeSingle();
+  
+  if (authStatusError) {
+    newsLogger.debug("Could not check auth status (RPC may not exist)", {
+      error: authStatusError.message,
+      hint: "Run 004_rls_diagnostic.sql in Supabase to enable this check",
+    });
+  } else if (authStatus) {
+    newsLogger.debug("Supabase auth status (what RLS sees)", {
+      current_user_id: authStatus.current_user_id,
+      current_role: authStatus.current_role,
+    });
+  }
+
+  // First check if the news item exists
+  const { data: existingNews, error: checkError } = await supabase
+    .from("news")
+    .select("id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (checkError) {
+    newsLogger.error("Supabase check error before delete", checkError, {
+      code: checkError.code,
+      message: checkError.message,
+      newsId: id,
+    });
+    throw new Error(`خطا در بررسی خبر: ${checkError.message}`);
+  }
+
+  if (!existingNews) {
+    throw new Error("خبر مورد نظر یافت نشد یا قبلاً حذف شده است");
+  }
+
+  // Now delete
+  const { error } = await supabase
+    .from("news")
+    .delete()
+    .eq("id", id);
 
   if (error) {
-    throw new Error("Failed to delete news");
+    newsLogger.error("Supabase delete error", error, {
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      message: error.message,
+      newsId: id,
+    });
+    throw new Error(`خطا در حذف خبر: ${error.message}`);
   }
+
+  // Verify deletion by checking if the row still exists
+  const { data: stillExists } = await supabase
+    .from("news")
+    .select("id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (stillExists) {
+    newsLogger.error("Delete failed - row still exists", null, { newsId: id });
+    throw new Error("حذف خبر انجام نشد. احتمالاً دسترسی لازم را ندارید.");
+  }
+
+  newsLogger.debug("Delete verified successful", { newsId: id });
 }
 

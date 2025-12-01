@@ -2,29 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Plus, Edit, Trash2, X, Check, Eye, EyeOff } from "lucide-react";
+import { NewsForm, type NewsFormData } from "./news-form";
+import { NewsTable } from "./news-table";
 import type { NewsItem, NewsStatus } from "@/lib/types";
+
+// Re-export NewsFormData for external use
+export type { NewsFormData };
 
 interface NewsManagementProps {
   initialNews: NewsItem[];
@@ -32,15 +15,6 @@ interface NewsManagementProps {
   onUpdateNews: (id: number, data: Partial<NewsFormData>) => Promise<{ success: boolean; error?: string }>;
   onDeleteNews: (id: number) => Promise<{ success: boolean; error?: string }>;
   onToggleStatus: (id: number, status: NewsStatus) => Promise<{ success: boolean; error?: string }>;
-}
-
-export interface NewsFormData {
-  title: string;
-  slug: string;
-  excerpt: string;
-  content: string;
-  image_url: string;
-  status: NewsStatus;
 }
 
 const emptyFormData: NewsFormData = {
@@ -52,6 +26,9 @@ const emptyFormData: NewsFormData = {
   status: "draft",
 };
 
+/**
+ * Generate slug from title
+ */
 function generateSlug(title: string): string {
   return title
     .toLowerCase()
@@ -62,16 +39,6 @@ function generateSlug(title: string): string {
     .replace(/^-|-$/g, ""); // Remove leading/trailing dashes
 }
 
-function formatDate(dateString: string | null): string {
-  if (!dateString) return "-";
-  const date = new Date(dateString);
-  return new Intl.DateTimeFormat("fa-IR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
-
 export function NewsManagement({
   initialNews,
   onCreateNews,
@@ -80,13 +47,18 @@ export function NewsManagement({
   onToggleStatus,
 }: NewsManagementProps) {
   const router = useRouter();
-  const [news, setNews] = useState<NewsItem[]>(initialNews);
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState<NewsFormData>(emptyFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const isFormOpen = isCreating || editingId !== null;
+
+  // ==========================================================================
+  // Message helpers
+  // ==========================================================================
 
   const showMessage = (message: string, isError: boolean = false) => {
     if (isError) {
@@ -101,6 +73,10 @@ export function NewsManagement({
       setSuccessMessage(null);
     }, 3000);
   };
+
+  // ==========================================================================
+  // Form handlers
+  // ==========================================================================
 
   const handleCreateClick = () => {
     setIsCreating(true);
@@ -174,11 +150,17 @@ export function NewsManagement({
         }
       }
     } catch (err) {
-      showMessage("خطای غیرمنتظره رخ داد", true);
+      console.error("Create/Update news error:", err);
+      const message = err instanceof Error ? err.message : "خطای غیرمنتظره رخ داد";
+      showMessage(message, true);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // ==========================================================================
+  // Table handlers
+  // ==========================================================================
 
   const handleDelete = async (id: number) => {
     if (!confirm("آیا از حذف این خبر اطمینان دارید؟")) {
@@ -195,7 +177,9 @@ export function NewsManagement({
         showMessage(result.error || "خطا در حذف خبر", true);
       }
     } catch (err) {
-      showMessage("خطای غیرمنتظره رخ داد", true);
+      console.error("Delete news error:", err);
+      const message = err instanceof Error ? err.message : "خطای غیرمنتظره رخ داد";
+      showMessage(message, true);
     } finally {
       setIsSubmitting(false);
     }
@@ -214,11 +198,17 @@ export function NewsManagement({
         showMessage(result.error || "خطا در تغییر وضعیت", true);
       }
     } catch (err) {
-      showMessage("خطای غیرمنتظره رخ داد", true);
+      console.error("Toggle status error:", err);
+      const message = err instanceof Error ? err.message : "خطای غیرمنتظره رخ داد";
+      showMessage(message, true);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // ==========================================================================
+  // Render
+  // ==========================================================================
 
   return (
     <div className="space-y-6">
@@ -235,194 +225,28 @@ export function NewsManagement({
       )}
 
       {/* Create/Edit Form */}
-      {(isCreating || editingId !== null) && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{isCreating ? "ایجاد خبر جدید" : "ویرایش خبر"}</CardTitle>
-            <CardDescription>
-              {isCreating ? "اطلاعات خبر جدید را وارد کنید" : "اطلاعات خبر را ویرایش کنید"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">عنوان خبر *</Label>
-                <Input
-                  id="title"
-                  value={formData.title}
-                  onChange={(e) => handleTitleChange(e.target.value)}
-                  placeholder="عنوان خبر را وارد کنید"
-                  disabled={isSubmitting}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="slug">شناسه لینک (slug) *</Label>
-                <Input
-                  id="slug"
-                  value={formData.slug}
-                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                  placeholder="news-slug"
-                  className="font-mono text-sm"
-                  dir="ltr"
-                  disabled={isSubmitting}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="excerpt">خلاصه خبر</Label>
-              <Textarea
-                id="excerpt"
-                value={formData.excerpt}
-                onChange={(e) => setFormData({ ...formData, excerpt: e.target.value })}
-                placeholder="خلاصه کوتاه از خبر..."
-                rows={2}
-                disabled={isSubmitting}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="content">محتوای خبر</Label>
-              <Textarea
-                id="content"
-                value={formData.content}
-                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                placeholder="محتوای کامل خبر را وارد کنید..."
-                rows={6}
-                disabled={isSubmitting}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="image_url">آدرس تصویر</Label>
-                <Input
-                  id="image_url"
-                  value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                  placeholder="https://..."
-                  dir="ltr"
-                  disabled={isSubmitting}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="status">وضعیت</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value: NewsStatus) => setFormData({ ...formData, status: value })}
-                  disabled={isSubmitting}
-                >
-                  <SelectTrigger id="status">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">پیش‌نویس</SelectItem>
-                    <SelectItem value="published">منتشر شده</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-4">
-              <Button onClick={handleSubmit} disabled={isSubmitting}>
-                <Check className="ml-2 h-4 w-4" />
-                {isSubmitting ? "در حال ذخیره..." : "ذخیره"}
-              </Button>
-              <Button variant="outline" onClick={handleCancel} disabled={isSubmitting}>
-                <X className="ml-2 h-4 w-4" />
-                انصراف
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      {isFormOpen && (
+        <NewsForm
+          formData={formData}
+          isCreating={isCreating}
+          isSubmitting={isSubmitting}
+          onFormDataChange={setFormData}
+          onTitleChange={handleTitleChange}
+          onSubmit={handleSubmit}
+          onCancel={handleCancel}
+        />
       )}
 
       {/* News List */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>لیست اخبار</CardTitle>
-              <CardDescription>{initialNews.length} خبر</CardDescription>
-            </div>
-            {!isCreating && editingId === null && (
-              <Button onClick={handleCreateClick}>
-                <Plus className="ml-2 h-4 w-4" />
-                ایجاد خبر جدید
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {initialNews.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              هیچ خبری ثبت نشده است
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>عنوان</TableHead>
-                  <TableHead>تاریخ ایجاد</TableHead>
-                  <TableHead>تاریخ انتشار</TableHead>
-                  <TableHead>وضعیت</TableHead>
-                  <TableHead>عملیات</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {initialNews.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium max-w-xs truncate">
-                      {item.title}
-                    </TableCell>
-                    <TableCell>{formatDate(item.created_at)}</TableCell>
-                    <TableCell>{formatDate(item.published_at)}</TableCell>
-                    <TableCell>
-                      <Badge variant={item.status === "published" ? "success" : "secondary"}>
-                        {item.status === "published" ? "منتشر شده" : "پیش‌نویس"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleToggleStatus(item.id, item.status)}
-                          disabled={isSubmitting}
-                          title={item.status === "published" ? "تبدیل به پیش‌نویس" : "انتشار"}
-                        >
-                          {item.status === "published" ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditClick(item)}
-                          disabled={isSubmitting || editingId !== null || isCreating}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDelete(item.id)}
-                          disabled={isSubmitting}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <NewsTable
+        news={initialNews}
+        isFormOpen={isFormOpen}
+        isSubmitting={isSubmitting}
+        onCreateClick={handleCreateClick}
+        onEditClick={handleEditClick}
+        onDeleteClick={handleDelete}
+        onToggleStatus={handleToggleStatus}
+      />
     </div>
   );
 }
-

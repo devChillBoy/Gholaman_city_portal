@@ -1,4 +1,4 @@
-import { getSupabaseClient } from "./supabaseClient";
+import { createServerSupabaseClient } from "./supabase-server";
 import type { NewsItem } from "./types";
 
 export type { NewsItem };
@@ -13,7 +13,7 @@ export async function getNewsList(
   page: number,
   pageSize: number
 ): Promise<{ items: NewsItem[]; total: number }> {
-  const supabase = getSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   const from = page * pageSize;
   const to = from + pageSize - 1;
@@ -42,7 +42,7 @@ export async function getNewsList(
  * @returns NewsItem if found, null otherwise
  */
 export async function getNewsBySlug(slug: string): Promise<NewsItem | null> {
-  const supabase = getSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   const { data, error } = await supabase
     .from("news")

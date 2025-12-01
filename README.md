@@ -1,88 +1,129 @@
 # شهرداری غلامان - سامانه خدمات الکترونیکی
 
-پورتال شهرداری غلامان با استفاده از Next.js App Router، TypeScript و Tailwind CSS ساخته شده است.
+پورتال شهرداری غلامان با استفاده از Next.js App Router، TypeScript، Tailwind CSS و Supabase ساخته شده است.
 
 ## ویژگی‌ها
 
 - ✅ رابط کاربری RTL با پشتیبانی کامل از زبان فارسی
 - ✅ طراحی واکنش‌گرا و مناسب برای موبایل
-- ✅ سیستم ثبت و پیگیری درخواست‌ها
-- ✅ مدیریت اخبار و رویدادها
+- ✅ سیستم ثبت و پیگیری درخواست‌ها (Supabase)
+- ✅ مدیریت اخبار و رویدادها (Supabase)
 - ✅ داشبورد پرسنل برای مدیریت درخواست‌ها
-- ✅ پنل مدیریت اخبار
+- ✅ پنل مدیریت اخبار (فقط برای ادمین‌ها)
+- ✅ احراز هویت با Supabase Auth
+- ✅ محافظت از روت‌ها با middleware
 
 ## تکنولوژی‌ها
 
 - **Next.js 14** (App Router)
-- **TypeScript**
+- **TypeScript** (Strict Mode)
+- **Supabase** (Auth, Database, RLS)
 - **Tailwind CSS**
 - **shadcn/ui** (کامپوننت‌های UI)
+- **Zod** (Validation)
 - **Lucide React** (آیکون‌ها)
 
 ## نصب و راه‌اندازی
 
-1. نصب وابستگی‌ها:
+### ۱. نصب وابستگی‌ها
+
 ```bash
 npm install
 ```
 
-2. اجرای پروژه در حالت توسعه:
+### ۲. تنظیم متغیرهای محیطی
+
+فایل `.env.local` در ریشه پروژه ایجاد کنید:
+
+```env
+# Supabase Configuration
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+
+# Admin emails (comma-separated)
+NEXT_PUBLIC_ADMIN_EMAILS=admin@gholaman.ir,manager@gholaman.ir
+```
+
+### ۳. اجرای Migration های Supabase
+
+فایل‌های SQL در پوشه `supabase/migrations/` را به ترتیب در Supabase SQL Editor اجرا کنید:
+
+1. `001_rls_policies.sql` - سیاست‌های Row Level Security
+2. `002_indexes.sql` - ایندکس‌های دیتابیس
+3. `003_request_stats_rpc.sql` - تابع RPC برای آمار
+
+### ۴. اجرای پروژه
+
 ```bash
 npm run dev
 ```
 
-3. باز کردن مرورگر در آدرس:
-```
-http://localhost:3000
-```
+سپس مرورگر را در آدرس `http://localhost:3000` باز کنید.
 
 ## ساختار پروژه
 
 ```
 ├── app/                    # صفحات و روت‌های Next.js
 │   ├── page.tsx           # صفحه اصلی
-│   ├── services/          # صفحات خدمات
-│   ├── track/             # صفحات پیگیری
-│   ├── news/               # صفحات اخبار
-│   ├── employees/          # صفحات پرسنل
-│   └── admin/              # صفحات مدیریت
-├── components/             # کامپوننت‌های React
-│   ├── ui/                # کامپوننت‌های shadcn/ui
-│   ├── Header.tsx         # هدر سایت
-│   └── Footer.tsx         # فوتر سایت
-└── lib/                    # توابع و داده‌های کمکی
-    ├── constants.ts       # ثوابت و داده‌های استاتیک
-    └── mock-data.ts       # داده‌های آزمایشی
+│   ├── services/          # فرم‌های ثبت درخواست
+│   ├── track/             # پیگیری درخواست‌ها
+│   ├── news/              # نمایش اخبار
+│   ├── employees/         # ورود و داشبورد پرسنل
+│   └── admin/             # پنل مدیریت (ادمین)
+├── components/            # کامپوننت‌های React
+│   ├── ui/               # کامپوننت‌های shadcn/ui
+│   ├── Header.tsx        # هدر سایت
+│   └── Footer.tsx        # فوتر سایت
+├── lib/                   # سرویس‌ها و توابع کمکی
+│   ├── supabase-server.ts    # کلاینت Supabase (سرور)
+│   ├── supabaseBrowserClient.ts  # کلاینت Supabase (مرورگر)
+│   ├── auth-roles.ts     # توابع بررسی نقش
+│   ├── auth-helpers.ts   # توابع احراز هویت (مرورگر)
+│   ├── server-auth.ts    # توابع احراز هویت (سرور)
+│   ├── news-service.ts   # سرویس اخبار
+│   ├── request-service.ts    # سرویس درخواست‌ها
+│   ├── validations.ts    # Zod schemas
+│   └── types.ts          # تایپ‌های مشترک
+├── supabase/             # Migration های Supabase
+│   └── migrations/
+├── middleware.ts         # محافظت از روت‌ها
+└── package.json
 ```
 
 ## صفحات اصلی
 
-- `/` - صفحه اصلی
-- `/services` - لیست خدمات
-- `/services/137` - ثبت شکایت ۱۳۷
-- `/services/building-permit` - درخواست پروانه ساختمانی
-- `/services/payments` - پرداخت عوارض
-- `/track` - پیگیری درخواست
-- `/news` - لیست اخبار
-- `/employees/login` - ورود پرسنل
-- `/employees/dashboard` - داشبورد پرسنل
-- `/admin/news` - مدیریت اخبار
+| مسیر | توضیح | دسترسی |
+|------|-------|--------|
+| `/` | صفحه اصلی | عمومی |
+| `/services` | لیست خدمات | عمومی |
+| `/services/137` | ثبت شکایت ۱۳۷ | عمومی |
+| `/services/building-permit` | درخواست پروانه | عمومی |
+| `/services/payments` | پرداخت عوارض | عمومی |
+| `/track` | پیگیری درخواست | عمومی |
+| `/news` | لیست اخبار | عمومی |
+| `/employees/login` | ورود پرسنل | عمومی |
+| `/employees/dashboard` | داشبورد پرسنل | کارمند/ادمین |
+| `/admin/news` | مدیریت اخبار | فقط ادمین |
 
-## نکات مهم
+## نقش‌های کاربری
 
-- تمام داده‌ها در حال حاضر به صورت Mock هستند و آماده اتصال به Supabase می‌باشند.
-- توابع در `lib/mock-data.ts` با کامنت `TODO` مشخص شده‌اند که باید با Supabase جایگزین شوند.
-- فونت Vazirmatn برای نمایش بهتر متن‌های فارسی استفاده شده است.
+- **شهروند**: ثبت درخواست، پیگیری، مشاهده اخبار
+- **کارمند**: دسترسی به داشبورد درخواست‌ها
+- **ادمین**: مدیریت اخبار + تمام دسترسی‌های کارمند
 
-## آماده‌سازی برای Supabase
+تعیین نقش ادمین از طریق متغیر `NEXT_PUBLIC_ADMIN_EMAILS` انجام می‌شود.
 
-برای اتصال به Supabase:
+## امنیت
 
-1. توابع در `lib/mock-data.ts` را با فراخوانی‌های Supabase جایگزین کنید
-2. Authentication را در `/app/employees/login/page.tsx` پیاده‌سازی کنید
-3. جداول Supabase را مطابق با interface های موجود در `lib/mock-data.ts` ایجاد کنید
+- ✅ محافظت از روت‌ها با Next.js Middleware
+- ✅ احراز هویت سمت سرور با Supabase SSR
+- ✅ Row Level Security در Supabase
+- ✅ Sanitize کردن HTML با DOMPurify
+- ✅ Validation با Zod
 
 ## لایسنس
 
 این پروژه برای استفاده در شهرداری غلامان ساخته شده است.
-

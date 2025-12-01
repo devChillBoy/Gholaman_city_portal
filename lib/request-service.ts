@@ -1,4 +1,4 @@
-import { getSupabaseClient } from "./supabaseClient";
+import { createServerSupabaseClient } from "./supabase-server";
 import type { RequestStatus, ServiceType, RequestRecord, CreateRequestInput } from "./types";
 
 // Re-export types for convenience
@@ -47,7 +47,7 @@ export function generateTrackingCode(serviceType: ServiceType): string {
 export async function createRequest(
   input: CreateRequestInput
 ): Promise<RequestRecord> {
-  const supabase = getSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   const code = generateTrackingCode(input.service_type);
 
@@ -81,7 +81,7 @@ export async function createRequest(
 export async function getRequestByCode(
   code: string
 ): Promise<RequestRecord | null> {
-  const supabase = getSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   const { data, error } = await supabase
     .from("requests")
@@ -104,7 +104,7 @@ export async function getRequestByCode(
 export async function getRecentRequests(
   limit = 20
 ): Promise<RequestRecord[]> {
-  const supabase = getSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   const { data, error } = await supabase
     .from("requests")
@@ -129,7 +129,7 @@ export async function getRequestsByStatus(
   status?: RequestStatus,
   limit = 50
 ): Promise<RequestRecord[]> {
-  const supabase = getSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   let query = supabase
     .from("requests")
@@ -162,13 +162,29 @@ export interface RequestStats {
 }
 
 /**
- * Get request statistics using efficient COUNT queries
+ * Get request statistics using optimized RPC function
+ * Falls back to multiple queries if RPC is not available
  * @returns Object containing counts for each status and total
  */
 export async function getRequestStats(): Promise<RequestStats> {
-  const supabase = getSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
-  // Run all count queries in parallel for efficiency
+  // Try to use the optimized RPC function first (single query)
+  const { data: rpcData, error: rpcError } = await supabase.rpc("get_request_stats");
+
+  if (!rpcError && rpcData) {
+    // RPC succeeded - return the result
+    return {
+      all: rpcData.all || 0,
+      pending: rpcData.pending || 0,
+      "in-review": rpcData["in-review"] || 0,
+      completed: rpcData.completed || 0,
+      rejected: rpcData.rejected || 0,
+    };
+  }
+
+  // Fallback: Run all count queries in parallel
+  // This is used if the RPC function hasn't been created yet
   const [allResult, pendingResult, inReviewResult, completedResult, rejectedResult] = await Promise.all([
     supabase.from("requests").select("*", { count: "exact", head: true }),
     supabase.from("requests").select("*", { count: "exact", head: true }).eq("status", "pending"),

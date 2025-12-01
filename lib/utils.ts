@@ -2,10 +2,42 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { format } from "date-fns-jalali";
 import { faIR } from "date-fns-jalali/locale";
+import DOMPurify from "isomorphic-dompurify";
 import type { ServiceType } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+/**
+ * Sanitize HTML content to prevent XSS attacks
+ * @param html - Raw HTML string
+ * @returns Sanitized HTML string safe for rendering
+ */
+export function sanitizeHtml(html: string | null | undefined): string {
+  if (!html) return "";
+  
+  return DOMPurify.sanitize(html, {
+    // Allow common HTML tags for content
+    ALLOWED_TAGS: [
+      "p", "br", "strong", "b", "em", "i", "u", "s", "strike",
+      "h1", "h2", "h3", "h4", "h5", "h6",
+      "ul", "ol", "li",
+      "a", "img",
+      "blockquote", "pre", "code",
+      "table", "thead", "tbody", "tr", "th", "td",
+      "div", "span",
+    ],
+    // Allow safe attributes
+    ALLOWED_ATTR: [
+      "href", "src", "alt", "title", "class", "id",
+      "target", "rel",
+    ],
+    // Force all links to open in new tab with safe rel attribute
+    ADD_ATTR: ["target", "rel"],
+    // Transform links to be safe
+    ALLOW_DATA_ATTR: false,
+  });
 }
 
 /**

@@ -1,9 +1,11 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 let client: SupabaseClient | null = null;
 
 /**
  * Get a Supabase client instance for browser-side use
+ * Uses @supabase/ssr for proper cookie handling with Next.js App Router
  * This function should only be used in client components
  */
 export function getSupabaseBrowserClient(): SupabaseClient {
@@ -17,8 +19,7 @@ export function getSupabaseBrowserClient(): SupabaseClient {
       );
     }
 
-    client = createClient(url, key);
+    client = createBrowserClient(url, key);
   }
   return client;
 }
-

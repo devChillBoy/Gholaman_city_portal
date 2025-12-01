@@ -1,21 +1,26 @@
 import type { User } from "@supabase/supabase-js";
-import { getSupabaseClient } from "./supabaseClient";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createServerSupabaseClient } from "./supabase-server";
+import { getUserRole, isAdmin, isEmployee } from "./auth-roles";
+import { authLogger } from "./logger";
 import type { AppRole } from "./types";
 
+// Re-export role functions for convenience
+export { getUserRole, isAdmin, isEmployee };
 export type { AppRole };
 
 // =============================================================================
-// Admin Email Configuration
+// Types for authenticated context
 // =============================================================================
 
 /**
- * List of admin email addresses loaded from environment variable
- * Format: NEXT_PUBLIC_ADMIN_EMAILS=admin@gholaman.ir, boss@gholaman.ir
+ * Result of successful authentication containing both user and supabase client
+ * Using the same client ensures session consistency for database operations
  */
-const ADMIN_EMAILS: string[] = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
+export interface AuthenticatedContext {
+  user: User;
+  supabase: SupabaseClient;
+}
 
 // =============================================================================
 // Server-side Authentication Functions
@@ -23,77 +28,59 @@ const ADMIN_EMAILS: string[] = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
 
 /**
  * Get the current authenticated user on the server side
- * Uses cookies/headers to determine the authenticated user
+ * Uses cookies to properly read the session
  * @returns Promise with User object or null if not authenticated
  */
 export async function getServerUser(): Promise<User | null> {
   try {
-    const supabase = getSupabaseClient();
+    const supabase = await createServerSupabaseClient();
     const {
       data: { user },
       error,
     } = await supabase.auth.getUser();
 
     if (error) {
+      authLogger.warn("Failed to get user from session", {
+        errorCode: error.status,
+        errorMessage: error.message,
+      });
       return null;
     }
 
     return user;
-  } catch {
+  } catch (error) {
+    authLogger.error("Unexpected error getting server user", error);
     return null;
   }
 }
 
-// =============================================================================
-// Role Functions (Email-based)
-// =============================================================================
-
 /**
- * Get the application role for a user based on their email address
- * - Admin: Email is in NEXT_PUBLIC_ADMIN_EMAILS list
- * - Employee: Any other authenticated user
- * - Unknown: Not authenticated
- * 
- * @param user - Supabase User object or null
- * @returns The user's role: "admin", "employee", or "unknown"
+ * Get authenticated user along with the Supabase client that validated them
+ * This is important for session consistency - the same client should be used
+ * for both auth validation and subsequent database operations
+ * @returns Promise with AuthenticatedContext or null if not authenticated
  */
-export function getUserRole(user: User | null): AppRole {
-  if (!user) {
-    return "unknown";
+export async function getAuthenticatedContext(): Promise<AuthenticatedContext | null> {
+  try {
+    const supabase = await createServerSupabaseClient();
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+
+    if (error || !user) {
+      authLogger.warn("Failed to get authenticated context", {
+        errorCode: error?.status,
+        errorMessage: error?.message,
+      });
+      return null;
+    }
+
+    return { user, supabase };
+  } catch (error) {
+    authLogger.error("Unexpected error getting authenticated context", error);
+    return null;
   }
-
-  const email = user.email?.toLowerCase() || "";
-
-  // Check if email is in admin list
-  if (ADMIN_EMAILS.includes(email)) {
-    return "admin";
-  }
-
-  // Any logged-in user who is not in the admin list is treated as an employee
-  return "employee";
-}
-
-/**
- * Check if the user is an admin
- * @param user - Supabase User object or null
- * @returns true if the user's email is in the admin list
- */
-export function isAdmin(user: User | null): boolean {
-  return getUserRole(user) === "admin";
-}
-
-/**
- * Check if the user is an employee (including admins)
- * Any authenticated user is considered an employee
- * @param user - Supabase User object or null
- * @returns true if the user is authenticated
- */
-export function isEmployee(user: User | null): boolean {
-  if (!user) return false;
-  
-  const role = getUserRole(user);
-  // All authenticated users (admins and employees) can access employee pages
-  return role === "employee" || role === "admin";
 }
 
 // =============================================================================
@@ -102,36 +89,69 @@ export function isEmployee(user: User | null): boolean {
 
 /**
  * Require admin role for server actions
- * Throws an error if user is not authenticated or not an admin
+ * Returns both the user AND the Supabase client to ensure session consistency
+ * The returned Supabase client should be used for all subsequent database operations
+ * 
+ * @throws Error if user is not authenticated or not an admin
+ * @returns AuthenticatedContext with user and supabase client
  */
-export async function requireAdmin(): Promise<User> {
-  const user = await getServerUser();
-  
-  if (!user) {
+export async function requireAdmin(): Promise<AuthenticatedContext> {
+  const context = await getAuthenticatedContext();
+
+  if (!context) {
+    authLogger.warn("Admin access attempted without authentication");
     throw new Error("Authentication required");
   }
-  
+
+  const { user, supabase } = context;
+
   if (!isAdmin(user)) {
+    authLogger.warn("Non-admin user attempted admin action", {
+      userId: user.id,
+      email: user.email,
+      role: getUserRole(user),
+    });
     throw new Error("Admin access required");
   }
-  
-  return user;
+
+  authLogger.debug("Admin access granted", {
+    userId: user.id,
+    email: user.email,
+  });
+
+  return { user, supabase };
 }
 
 /**
  * Require employee role for server actions
- * Throws an error if user is not authenticated or not an employee
+ * Returns both the user AND the Supabase client to ensure session consistency
+ * 
+ * @throws Error if user is not authenticated or not an employee
+ * @returns AuthenticatedContext with user and supabase client
  */
-export async function requireEmployee(): Promise<User> {
-  const user = await getServerUser();
-  
-  if (!user) {
+export async function requireEmployee(): Promise<AuthenticatedContext> {
+  const context = await getAuthenticatedContext();
+
+  if (!context) {
+    authLogger.warn("Employee access attempted without authentication");
     throw new Error("Authentication required");
   }
-  
+
+  const { user, supabase } = context;
+
   if (!isEmployee(user)) {
+    authLogger.warn("Non-employee user attempted employee action", {
+      userId: user.id,
+      email: user.email,
+      role: getUserRole(user),
+    });
     throw new Error("Employee access required");
   }
-  
-  return user;
+
+  authLogger.debug("Employee access granted", {
+    userId: user.id,
+    email: user.email,
+  });
+
+  return { user, supabase };
 }

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NewsImage } from "@/components/NewsImage";
 import { getNewsBySlug, getNewsList } from "@/lib/news-service";
-import { formatNewsDate } from "@/lib/utils";
+import { formatNewsDate, sanitizeHtml } from "@/lib/utils";
 import { ArrowRight, ArrowLeft } from "lucide-react";
 
 // Revalidate news details every 60 seconds
@@ -75,7 +75,7 @@ export default async function NewsDetailPage({ params }: PageProps) {
           {news.content && (
             <div
               className="prose prose-lg max-w-none"
-              dangerouslySetInnerHTML={{ __html: news.content }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(news.content) }}
             />
           )}
         </article>

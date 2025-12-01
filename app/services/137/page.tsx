@@ -13,12 +13,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CopyButton } from "@/components/CopyButton";
+import { useToast } from "@/components/ui/toast";
 import { submitComplaint137 } from "../actions";
 import { complaintCategories } from "@/lib/constants";
 import { CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 
 export default function Complaint137Page() {
+  const toast = useToast();
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -49,8 +52,11 @@ export default function Complaint137Page() {
 
       setTrackingCode(request.code);
       setSubmitted(true);
+      toast.success("شکایت شما با موفقیت ثبت شد");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "خطا در ثبت شکایت. لطفاً دوباره تلاش کنید.");
+      const errorMessage = err instanceof Error ? err.message : "خطا در ثبت شکایت. لطفاً دوباره تلاش کنید.";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -72,8 +78,14 @@ export default function Complaint137Page() {
           <CardContent className="text-center space-y-6">
             <div className="bg-gray-100 p-6 rounded-lg">
               <p className="text-sm text-gray-600 mb-2">کد رهگیری</p>
-              <p className="text-3xl font-bold text-primary font-mono">{trackingCode}</p>
+              <div className="flex items-center justify-center gap-3">
+                <p className="text-3xl font-bold text-primary font-mono">{trackingCode}</p>
+                <CopyButton text={trackingCode} showLabel={false} size="icon" />
+              </div>
             </div>
+            <p className="text-sm text-gray-500">
+              این کد را ذخیره کنید. برای پیگیری وضعیت درخواست به آن نیاز دارید.
+            </p>
             <div className="flex gap-4 justify-center">
               <Button asChild>
                 <Link href={`/track/${trackingCode}`}>مشاهده وضعیت</Link>
@@ -194,4 +206,3 @@ export default function Complaint137Page() {
     </div>
   );
 }
-

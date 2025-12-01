@@ -1,24 +1,14 @@
 import type { User } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "./supabaseBrowserClient";
+import { getUserRole, isAdmin, isEmployee } from "./auth-roles";
 import type { AppRole } from "./types";
 
+// Re-export role functions for convenience
+export { getUserRole, isAdmin, isEmployee };
 export type { AppRole };
 
 // =============================================================================
-// Admin Email Configuration
-// =============================================================================
-
-/**
- * List of admin email addresses loaded from environment variable
- * Format: NEXT_PUBLIC_ADMIN_EMAILS=admin@gholaman.ir, boss@gholaman.ir
- */
-const ADMIN_EMAILS: string[] = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
-
-// =============================================================================
-// Authentication Functions
+// Browser-side Authentication Functions
 // =============================================================================
 
 /**
@@ -58,7 +48,7 @@ export async function signInEmployee(
 }
 
 /**
- * Get the current authenticated user
+ * Get the current authenticated user (browser-side)
  * @returns Promise with User object or null if not authenticated
  */
 export async function getCurrentUser(): Promise<User | null> {
@@ -86,56 +76,4 @@ export async function getCurrentUser(): Promise<User | null> {
 export async function signOutEmployee(): Promise<void> {
   const supabase = getSupabaseBrowserClient();
   await supabase.auth.signOut();
-}
-
-// =============================================================================
-// Role Functions (Email-based)
-// =============================================================================
-
-/**
- * Get the application role for a user based on their email address
- * - Admin: Email is in NEXT_PUBLIC_ADMIN_EMAILS list
- * - Employee: Any other authenticated user
- * - Unknown: Not authenticated
- * 
- * @param user - Supabase User object or null
- * @returns The user's role: "admin", "employee", or "unknown"
- */
-export function getUserRole(user: User | null): AppRole {
-  if (!user) {
-    return "unknown";
-  }
-
-  const email = user.email?.toLowerCase() || "";
-
-  // Check if email is in admin list
-  if (ADMIN_EMAILS.includes(email)) {
-    return "admin";
-  }
-
-  // Any logged-in user who is not in the admin list is treated as an employee
-  return "employee";
-}
-
-/**
- * Check if the user is an admin
- * @param user - Supabase User object or null
- * @returns true if the user's email is in the admin list
- */
-export function isAdmin(user: User | null): boolean {
-  return getUserRole(user) === "admin";
-}
-
-/**
- * Check if the user is an employee (including admins)
- * Any authenticated user is considered an employee
- * @param user - Supabase User object or null
- * @returns true if the user is authenticated
- */
-export function isEmployee(user: User | null): boolean {
-  if (!user) return false;
-  
-  const role = getUserRole(user);
-  // All authenticated users (admins and employees) can access employee pages
-  return role === "employee" || role === "admin";
 }

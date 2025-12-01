@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { TrackingCodeDisplay } from "@/components/TrackingCodeDisplay";
 import { getRequestByCode } from "@/lib/request-service";
 import { requestStatuses } from "@/lib/constants";
 import { formatPersianDate, getServiceTypeLabel } from "@/lib/utils";
@@ -88,7 +89,7 @@ export default async function TrackDetailsPage({ params }: PageProps) {
               </div>
               <div>
                 <p className="text-sm text-gray-600 mb-1">کد رهگیری</p>
-                <p className="font-mono font-semibold">{request.code}</p>
+                <TrackingCodeDisplay code={request.code} />
               </div>
               <div>
                 <p className="text-sm text-gray-600 mb-1">تاریخ ثبت</p>

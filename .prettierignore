@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Build output
+.next/
+out/
+dist/
+
+# Cache
+.turbo/
+.vercel/
+
+# Generated
+*.lock
+package-lock.json
+
+# Config files that shouldn't be formatted
+*.md
+
