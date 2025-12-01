@@ -196,9 +196,10 @@ export async function deleteNews(id: number): Promise<void> {
       hint: "Run 004_rls_diagnostic.sql in Supabase to enable this check",
     });
   } else if (authStatus) {
+    const status = authStatus as { current_user_id?: string; current_role?: string };
     newsLogger.debug("Supabase auth status (what RLS sees)", {
-      current_user_id: authStatus.current_user_id,
-      current_role: authStatus.current_role,
+      current_user_id: status.current_user_id,
+      current_role: status.current_role,
     });
   }
 
