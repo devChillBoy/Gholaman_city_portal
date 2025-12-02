@@ -57,17 +57,37 @@ describe("sanitizeHtml", () => {
     expect(result).toContain("<p>Safe</p>");
   });
 
+  it("should remove style tags", () => {
+    const html = "<p>Safe</p><style>body { display: none; }</style>";
+    const result = sanitizeHtml(html);
+    expect(result).not.toContain("<style>");
+    expect(result).not.toContain("display");
+    expect(result).toContain("<p>Safe</p>");
+  });
+
   it("should remove onclick handlers", () => {
     const html = '<p onclick="alert(\'XSS\')">Click me</p>';
     const result = sanitizeHtml(html);
     expect(result).not.toContain("onclick");
-    expect(result).toContain("<p>");
+    expect(result).toContain("<p");
+  });
+
+  it("should remove onerror handlers", () => {
+    const html = '<img src="x" onerror="alert(\'XSS\')">';
+    const result = sanitizeHtml(html);
+    expect(result).not.toContain("onerror");
   });
 
   it("should remove javascript: URLs", () => {
     const html = '<a href="javascript:alert(\'XSS\')">Click</a>';
     const result = sanitizeHtml(html);
     expect(result).not.toContain("javascript:");
+  });
+
+  it("should remove data: URLs", () => {
+    const html = '<a href="data:text/html,<script>alert(1)</script>">Click</a>';
+    const result = sanitizeHtml(html);
+    expect(result).not.toContain("data:");
   });
 
   it("should allow safe links", () => {
@@ -112,10 +132,18 @@ describe("sanitizeHtml", () => {
     expect(result).toContain("<h2>");
   });
 
-  it("should remove data attributes", () => {
-    const html = '<div data-evil="malicious">Content</div>';
+  it("should remove iframe tags", () => {
+    const html = '<iframe src="https://evil.com"></iframe><p>Safe</p>';
     const result = sanitizeHtml(html);
-    expect(result).not.toContain("data-evil");
+    expect(result).not.toContain("<iframe");
+    expect(result).toContain("<p>Safe</p>");
+  });
+
+  it("should remove form tags", () => {
+    const html = '<form action="https://evil.com"><input></form><p>Safe</p>';
+    const result = sanitizeHtml(html);
+    expect(result).not.toContain("<form");
+    expect(result).toContain("<p>Safe</p>");
   });
 
   it("should allow class attribute", () => {

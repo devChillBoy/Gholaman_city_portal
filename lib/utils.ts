@@ -2,7 +2,6 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { format } from "date-fns-jalali";
 import { faIR } from "date-fns-jalali/locale";
-import DOMPurify from "isomorphic-dompurify";
 import type { ServiceType } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
@@ -11,33 +10,47 @@ export function cn(...inputs: ClassValue[]) {
 
 /**
  * Sanitize HTML content to prevent XSS attacks
+ *
+ * TEMPORARY IMPLEMENTATION:
+ * We removed isomorphic-dompurify because it depends on jsdom/parse5 which are
+ * pure ESM modules and cause ERR_REQUIRE_ESM errors in the Vercel/Next.js server runtime.
+ *
+ * This basic sanitizer strips dangerous elements and attributes. Admin-entered content
+ * is trusted, so this provides minimal protection against obvious XSS vectors.
+ *
+ * TODO: Consider using a lightweight server-compatible sanitizer like 'sanitize-html'
+ * or moving sanitization to a client-only component if more thorough sanitization is needed.
+ *
  * @param html - Raw HTML string
  * @returns Sanitized HTML string safe for rendering
  */
 export function sanitizeHtml(html: string | null | undefined): string {
   if (!html) return "";
-  
-  return DOMPurify.sanitize(html, {
-    // Allow common HTML tags for content
-    ALLOWED_TAGS: [
-      "p", "br", "strong", "b", "em", "i", "u", "s", "strike",
-      "h1", "h2", "h3", "h4", "h5", "h6",
-      "ul", "ol", "li",
-      "a", "img",
-      "blockquote", "pre", "code",
-      "table", "thead", "tbody", "tr", "th", "td",
-      "div", "span",
-    ],
-    // Allow safe attributes
-    ALLOWED_ATTR: [
-      "href", "src", "alt", "title", "class", "id",
-      "target", "rel",
-    ],
-    // Force all links to open in new tab with safe rel attribute
-    ADD_ATTR: ["target", "rel"],
-    // Transform links to be safe
-    ALLOW_DATA_ATTR: false,
-  });
+
+  let sanitized = html;
+
+  // Remove <script> tags and their content
+  sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
+
+  // Remove <style> tags and their content (can contain expressions in older IE)
+  sanitized = sanitized.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "");
+
+  // Remove <iframe>, <object>, <embed>, <form> tags
+  sanitized = sanitized.replace(/<(iframe|object|embed|form)\b[^>]*>[\s\S]*?<\/\1>/gi, "");
+  sanitized = sanitized.replace(/<(iframe|object|embed|form)\b[^>]*\/?>/gi, "");
+
+  // Remove event handlers (onclick, onerror, onload, etc.)
+  sanitized = sanitized.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, "");
+  sanitized = sanitized.replace(/\s*on\w+\s*=\s*[^\s>]+/gi, "");
+
+  // Remove javascript: and data: URLs from href and src attributes
+  sanitized = sanitized.replace(/(href|src)\s*=\s*["']?\s*javascript:[^"'\s>]*/gi, '$1=""');
+  sanitized = sanitized.replace(/(href|src)\s*=\s*["']?\s*data:[^"'\s>]*/gi, '$1=""');
+
+  // Remove vbscript: URLs (for older IE)
+  sanitized = sanitized.replace(/(href|src)\s*=\s*["']?\s*vbscript:[^"'\s>]*/gi, '$1=""');
+
+  return sanitized;
 }
 
 /**
