@@ -47,36 +47,41 @@ export function generateTrackingCode(serviceType: ServiceType): string {
 export async function createRequest(
   input: CreateRequestInput
 ): Promise<RequestRecord | null> {
-  const supabase = await createServerSupabaseClient();
+  try {
+    const supabase = await createServerSupabaseClient();
 
-  if (!supabase) {
-    console.error("Supabase client not available");
+    if (!supabase) {
+      console.error("Supabase client not available for createRequest");
+      return null;
+    }
+
+    const code = generateTrackingCode(input.service_type);
+
+    const { data, error } = await supabase
+      .from("requests")
+      .insert({
+        code,
+        service_type: input.service_type,
+        title: input.title,
+        description: input.description || null,
+        status: "pending" as RequestStatus,
+        payload: input.payload || null,
+        citizen_name: input.citizen_name || null,
+        citizen_phone: input.citizen_phone || null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Failed to create request:", error.message, error.code);
+      return null;
+    }
+
+    return data as RequestRecord;
+  } catch (error) {
+    console.error("Unexpected error in createRequest:", error);
     return null;
   }
-
-  const code = generateTrackingCode(input.service_type);
-
-  const { data, error } = await supabase
-    .from("requests")
-    .insert({
-      code,
-      service_type: input.service_type,
-      title: input.title,
-      description: input.description || null,
-      status: "pending" as RequestStatus,
-      payload: input.payload || null,
-      citizen_name: input.citizen_name || null,
-      citizen_phone: input.citizen_phone || null,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Failed to create request:", error);
-    return null;
-  }
-
-  return data as RequestRecord;
 }
 
 /**
@@ -87,25 +92,30 @@ export async function createRequest(
 export async function getRequestByCode(
   code: string
 ): Promise<RequestRecord | null> {
-  const supabase = await createServerSupabaseClient();
+  try {
+    const supabase = await createServerSupabaseClient();
 
-  if (!supabase) {
-    console.error("Supabase client not available");
+    if (!supabase) {
+      console.error("Supabase client not available for getRequestByCode");
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from("requests")
+      .select("*")
+      .eq("code", code)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Failed to load request:", error.message, error.code);
+      return null;
+    }
+
+    return (data as RequestRecord) || null;
+  } catch (error) {
+    console.error("Unexpected error in getRequestByCode:", error);
     return null;
   }
-
-  const { data, error } = await supabase
-    .from("requests")
-    .select("*")
-    .eq("code", code)
-    .maybeSingle();
-
-  if (error) {
-    console.error("Failed to load request:", error);
-    return null;
-  }
-
-  return (data as RequestRecord) || null;
 }
 
 /**
@@ -116,25 +126,30 @@ export async function getRequestByCode(
 export async function getRecentRequests(
   limit = 20
 ): Promise<RequestRecord[]> {
-  const supabase = await createServerSupabaseClient();
+  try {
+    const supabase = await createServerSupabaseClient();
 
-  if (!supabase) {
-    console.error("Supabase client not available");
+    if (!supabase) {
+      console.error("Supabase client not available for getRecentRequests");
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from("requests")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error("Failed to load requests:", error.message, error.code);
+      return [];
+    }
+
+    return (data as RequestRecord[]) || [];
+  } catch (error) {
+    console.error("Unexpected error in getRecentRequests:", error);
     return [];
   }
-
-  const { data, error } = await supabase
-    .from("requests")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error) {
-    console.error("Failed to load requests:", error);
-    return [];
-  }
-
-  return (data as RequestRecord[]) || [];
 }
 
 /**
@@ -147,31 +162,36 @@ export async function getRequestsByStatus(
   status?: RequestStatus,
   limit = 50
 ): Promise<RequestRecord[]> {
-  const supabase = await createServerSupabaseClient();
+  try {
+    const supabase = await createServerSupabaseClient();
 
-  if (!supabase) {
-    console.error("Supabase client not available");
+    if (!supabase) {
+      console.error("Supabase client not available for getRequestsByStatus");
+      return [];
+    }
+
+    let query = supabase
+      .from("requests")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("Failed to load requests:", error.message, error.code);
+      return [];
+    }
+
+    return (data as RequestRecord[]) || [];
+  } catch (error) {
+    console.error("Unexpected error in getRequestsByStatus:", error);
     return [];
   }
-
-  let query = supabase
-    .from("requests")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (status) {
-    query = query.eq("status", status);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error("Failed to load requests:", error);
-    return [];
-  }
-
-  return (data as RequestRecord[]) || [];
 }
 
 /**
@@ -191,8 +211,6 @@ export interface RequestStats {
  * @returns Object containing counts for each status and total
  */
 export async function getRequestStats(): Promise<RequestStats> {
-  const supabase = await createServerSupabaseClient();
-
   const emptyStats: RequestStats = {
     all: 0,
     pending: 0,
@@ -201,47 +219,54 @@ export async function getRequestStats(): Promise<RequestStats> {
     rejected: 0,
   };
 
-  if (!supabase) {
-    console.error("Supabase client not available");
-    return emptyStats;
-  }
+  try {
+    const supabase = await createServerSupabaseClient();
 
-  // Try to use the optimized RPC function first (single query)
-  const { data: rpcData, error: rpcError } = await supabase.rpc("get_request_stats");
+    if (!supabase) {
+      console.error("Supabase client not available for getRequestStats");
+      return emptyStats;
+    }
 
-  if (!rpcError && rpcData) {
-    // RPC succeeded - return the result
+    // Try to use the optimized RPC function first (single query)
+    const { data: rpcData, error: rpcError } = await supabase.rpc("get_request_stats");
+
+    if (!rpcError && rpcData) {
+      // RPC succeeded - return the result
+      return {
+        all: rpcData.all || 0,
+        pending: rpcData.pending || 0,
+        "in-review": rpcData["in-review"] || 0,
+        completed: rpcData.completed || 0,
+        rejected: rpcData.rejected || 0,
+      };
+    }
+
+    // Fallback: Run all count queries in parallel
+    // This is used if the RPC function hasn't been created yet
+    const [allResult, pendingResult, inReviewResult, completedResult, rejectedResult] = await Promise.all([
+      supabase.from("requests").select("*", { count: "exact", head: true }),
+      supabase.from("requests").select("*", { count: "exact", head: true }).eq("status", "pending"),
+      supabase.from("requests").select("*", { count: "exact", head: true }).eq("status", "in-review"),
+      supabase.from("requests").select("*", { count: "exact", head: true }).eq("status", "completed"),
+      supabase.from("requests").select("*", { count: "exact", head: true }).eq("status", "rejected"),
+    ]);
+
+    // Check for errors
+    if (allResult.error || pendingResult.error || inReviewResult.error || completedResult.error || rejectedResult.error) {
+      console.error("Failed to load request statistics");
+      return emptyStats;
+    }
+
     return {
-      all: rpcData.all || 0,
-      pending: rpcData.pending || 0,
-      "in-review": rpcData["in-review"] || 0,
-      completed: rpcData.completed || 0,
-      rejected: rpcData.rejected || 0,
+      all: allResult.count || 0,
+      pending: pendingResult.count || 0,
+      "in-review": inReviewResult.count || 0,
+      completed: completedResult.count || 0,
+      rejected: rejectedResult.count || 0,
     };
-  }
-
-  // Fallback: Run all count queries in parallel
-  // This is used if the RPC function hasn't been created yet
-  const [allResult, pendingResult, inReviewResult, completedResult, rejectedResult] = await Promise.all([
-    supabase.from("requests").select("*", { count: "exact", head: true }),
-    supabase.from("requests").select("*", { count: "exact", head: true }).eq("status", "pending"),
-    supabase.from("requests").select("*", { count: "exact", head: true }).eq("status", "in-review"),
-    supabase.from("requests").select("*", { count: "exact", head: true }).eq("status", "completed"),
-    supabase.from("requests").select("*", { count: "exact", head: true }).eq("status", "rejected"),
-  ]);
-
-  // Check for errors
-  if (allResult.error || pendingResult.error || inReviewResult.error || completedResult.error || rejectedResult.error) {
-    console.error("Failed to load request statistics");
+  } catch (error) {
+    console.error("Unexpected error in getRequestStats:", error);
     return emptyStats;
   }
-
-  return {
-    all: allResult.count || 0,
-    pending: pendingResult.count || 0,
-    "in-review": inReviewResult.count || 0,
-    completed: completedResult.count || 0,
-    rejected: rejectedResult.count || 0,
-  };
 }
 

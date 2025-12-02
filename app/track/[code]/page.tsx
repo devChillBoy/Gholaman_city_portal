@@ -3,18 +3,40 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrackingCodeDisplay } from "@/components/TrackingCodeDisplay";
-import { getRequestByCode } from "@/lib/request-service";
 import { requestStatuses } from "@/lib/constants";
 import { formatPersianDate, getServiceTypeLabel } from "@/lib/utils";
+import type { RequestRecord } from "@/lib/types";
 import { ArrowRight, CheckCircle2, Clock, XCircle, FileSearch } from "lucide-react";
+
+// Force dynamic rendering to handle Supabase connection safely
+export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ code: string }>;
 }
 
+// Helper function to safely fetch request by code
+async function fetchRequestByCode(code: string): Promise<RequestRecord | null> {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.warn("Supabase environment variables not configured");
+      return null;
+    }
+    
+    const { getRequestByCode } = await import("@/lib/request-service");
+    return await getRequestByCode(code);
+  } catch (error) {
+    console.error("Failed to load request by code:", error);
+    return null;
+  }
+}
+
 export default async function TrackDetailsPage({ params }: PageProps) {
   const { code } = await params;
-  const request = await getRequestByCode(code);
+  const request = await fetchRequestByCode(code);
 
   if (!request) {
     return (

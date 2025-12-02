@@ -2,20 +2,58 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NewsImage } from "@/components/NewsImage";
-import { getNewsBySlug, getNewsList } from "@/lib/news-service";
 import { formatNewsDate, sanitizeHtml } from "@/lib/utils";
+import type { NewsItem } from "@/lib/types";
 import { ArrowRight, ArrowLeft } from "lucide-react";
 
-// Revalidate news details every 60 seconds
-export const revalidate = 60;
+// Force dynamic rendering to handle Supabase connection safely
+export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
+// Helper function to safely fetch news by slug
+async function fetchNewsBySlug(slug: string): Promise<NewsItem | null> {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.warn("Supabase environment variables not configured");
+      return null;
+    }
+    
+    const { getNewsBySlug } = await import("@/lib/news-service");
+    return await getNewsBySlug(slug);
+  } catch (error) {
+    console.error("Failed to load news by slug:", error);
+    return null;
+  }
+}
+
+// Helper function to safely fetch related news
+async function fetchRelatedNews(excludeSlug: string): Promise<NewsItem[]> {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      return [];
+    }
+    
+    const { getNewsList } = await import("@/lib/news-service");
+    const { items } = await getNewsList(0, 4);
+    return items.filter((item) => item.slug !== excludeSlug).slice(0, 3);
+  } catch (error) {
+    console.error("Failed to load related news:", error);
+    return [];
+  }
+}
+
 export default async function NewsDetailPage({ params }: PageProps) {
   const { slug } = await params;
-  const news = await getNewsBySlug(slug);
+  const news = await fetchNewsBySlug(slug);
 
   if (!news) {
     return (
@@ -43,8 +81,7 @@ export default async function NewsDetailPage({ params }: PageProps) {
   }
 
   // Get related news (excluding current item)
-  const { items: allNews } = await getNewsList(0, 3);
-  const relatedNews = allNews.filter((item) => item.slug !== slug).slice(0, 3);
+  const relatedNews = await fetchRelatedNews(slug);
 
   return (
     <div className="container mx-auto px-4 py-12">
