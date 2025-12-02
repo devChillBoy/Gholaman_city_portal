@@ -34,6 +34,12 @@ export interface AuthenticatedContext {
 export async function getServerUser(): Promise<User | null> {
   try {
     const supabase = await createServerSupabaseClient();
+
+    if (!supabase) {
+      authLogger.error("Failed to create Supabase client: environment variables may be missing");
+      return null;
+    }
+
     const {
       data: { user },
       error,
@@ -63,6 +69,12 @@ export async function getServerUser(): Promise<User | null> {
 export async function getAuthenticatedContext(): Promise<AuthenticatedContext | null> {
   try {
     const supabase = await createServerSupabaseClient();
+
+    if (!supabase) {
+      authLogger.error("Failed to create Supabase client: environment variables may be missing");
+      return null;
+    }
+
     const {
       data: { user },
       error,

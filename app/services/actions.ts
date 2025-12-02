@@ -69,6 +69,15 @@ export async function submitComplaint137(
 
   try {
     const result = await createRequest(input);
+
+    if (!result) {
+      serviceLogger.error("Failed to create complaint 137: createRequest returned null", {
+        serviceType: "complaint_137",
+        input,
+      });
+      throw new Error(ERROR_MESSAGES.REQUEST_CREATION_FAILED);
+    }
+
     serviceLogger.info("Complaint 137 created successfully", {
       requestCode: result.code,
     });
@@ -123,6 +132,15 @@ export async function submitBuildingPermit(
 
   try {
     const result = await createRequest(input);
+
+    if (!result) {
+      serviceLogger.error("Failed to create building permit: createRequest returned null", {
+        serviceType: "building_permit",
+        input,
+      });
+      throw new Error(ERROR_MESSAGES.REQUEST_CREATION_FAILED);
+    }
+
     serviceLogger.info("Building permit created successfully", {
       requestCode: result.code,
     });
@@ -174,6 +192,15 @@ export async function submitPayment(data: PaymentInput): Promise<RequestRecord> 
 
   try {
     const result = await createRequest(input);
+
+    if (!result) {
+      serviceLogger.error("Failed to create payment: createRequest returned null", {
+        serviceType: "payment",
+        input,
+      });
+      throw new Error(ERROR_MESSAGES.REQUEST_CREATION_FAILED);
+    }
+
     serviceLogger.info("Payment created successfully", {
       requestCode: result.code,
     });
