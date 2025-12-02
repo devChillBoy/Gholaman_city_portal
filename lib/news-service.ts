@@ -15,6 +15,11 @@ export async function getNewsList(
 ): Promise<{ items: NewsItem[]; total: number }> {
   const supabase = await createServerSupabaseClient();
 
+  if (!supabase) {
+    console.error("Supabase client not available");
+    return { items: [], total: 0 };
+  }
+
   const from = page * pageSize;
   const to = from + pageSize - 1;
 
@@ -27,7 +32,8 @@ export async function getNewsList(
     .range(from, to);
 
   if (error) {
-    throw new Error("Failed to load news list");
+    console.error("Failed to load news list:", error);
+    return { items: [], total: 0 };
   }
 
   return {
@@ -44,6 +50,11 @@ export async function getNewsList(
 export async function getNewsBySlug(slug: string): Promise<NewsItem | null> {
   const supabase = await createServerSupabaseClient();
 
+  if (!supabase) {
+    console.error("Supabase client not available");
+    return null;
+  }
+
   const { data, error } = await supabase
     .from("news")
     .select("*")
@@ -52,7 +63,8 @@ export async function getNewsBySlug(slug: string): Promise<NewsItem | null> {
     .maybeSingle();
 
   if (error) {
-    throw new Error("Failed to load news item");
+    console.error("Failed to load news item:", error);
+    return null;
   }
 
   return (data as NewsItem) || null;

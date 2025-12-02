@@ -1,18 +1,20 @@
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieMethods } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 /**
  * Create a Supabase client for Server Components and Server Actions
  * This properly reads cookies for authentication
+ * Returns null if environment variables are not configured
  */
 export async function createServerSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !key) {
-    throw new Error(
-      "Missing Supabase environment variables. Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your Vercel environment variables."
+    console.error(
+      "Missing Supabase environment variables. Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set."
     );
+    return null;
   }
 
   const cookieStore = await cookies();
