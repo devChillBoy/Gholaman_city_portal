@@ -12,7 +12,16 @@ export const revalidate = 60;
 
 export default async function HomePage() {
   const popularServices = services.slice(0, 4);
-  const { items: latestNews } = await getNewsList(0, 3);
+  
+  // Fetch news with error handling
+  let latestNews = [];
+  try {
+    const newsResult = await getNewsList(0, 3);
+    latestNews = newsResult.items;
+  } catch (error) {
+    // If news fails to load, continue with empty array
+    console.error("Failed to load news:", error);
+  }
 
   return (
     <div className="flex flex-col">
