@@ -2,15 +2,34 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NewsImage } from "@/components/NewsImage";
-import { getNewsList } from "@/lib/news-service";
+import type { NewsItem } from "@/lib/types";
 import { formatNewsDate } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 
-// Revalidate news list every 60 seconds
-export const revalidate = 60;
+// Force dynamic rendering
+export const dynamic = "force-dynamic";
 
 interface PageProps {
   searchParams: Promise<{ page?: string }>;
+}
+
+// Helper function to safely fetch news
+async function fetchNews(page: number, pageSize: number): Promise<{ items: NewsItem[]; total: number }> {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.warn("Supabase environment variables not configured");
+      return { items: [], total: 0 };
+    }
+    
+    const { getNewsList } = await import("@/lib/news-service");
+    return await getNewsList(page, pageSize);
+  } catch (error) {
+    console.error("Failed to load news:", error);
+    return { items: [], total: 0 };
+  }
 }
 
 export default async function NewsPage({ searchParams }: PageProps) {
@@ -18,7 +37,7 @@ export default async function NewsPage({ searchParams }: PageProps) {
   const currentPage = parseInt(page || "1", 10);
   const pageSize = 6;
   
-  const { items, total } = await getNewsList(currentPage - 1, pageSize);
+  const { items, total } = await fetchNews(currentPage - 1, pageSize);
   const totalPages = Math.ceil(total / pageSize);
 
   return (
