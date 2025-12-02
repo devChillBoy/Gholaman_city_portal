@@ -42,12 +42,17 @@ export function generateTrackingCode(serviceType: ServiceType): string {
 /**
  * Create a new citizen request
  * @param input - The request data
- * @returns The created request record
+ * @returns The created request record or null if failed
  */
 export async function createRequest(
   input: CreateRequestInput
-): Promise<RequestRecord> {
+): Promise<RequestRecord | null> {
   const supabase = await createServerSupabaseClient();
+
+  if (!supabase) {
+    console.error("Supabase client not available");
+    return null;
+  }
 
   const code = generateTrackingCode(input.service_type);
 
@@ -67,7 +72,8 @@ export async function createRequest(
     .single();
 
   if (error) {
-    throw new Error("Failed to create request");
+    console.error("Failed to create request:", error);
+    return null;
   }
 
   return data as RequestRecord;
@@ -83,6 +89,11 @@ export async function getRequestByCode(
 ): Promise<RequestRecord | null> {
   const supabase = await createServerSupabaseClient();
 
+  if (!supabase) {
+    console.error("Supabase client not available");
+    return null;
+  }
+
   const { data, error } = await supabase
     .from("requests")
     .select("*")
@@ -90,7 +101,8 @@ export async function getRequestByCode(
     .maybeSingle();
 
   if (error) {
-    throw new Error("Failed to load request");
+    console.error("Failed to load request:", error);
+    return null;
   }
 
   return (data as RequestRecord) || null;
@@ -106,6 +118,11 @@ export async function getRecentRequests(
 ): Promise<RequestRecord[]> {
   const supabase = await createServerSupabaseClient();
 
+  if (!supabase) {
+    console.error("Supabase client not available");
+    return [];
+  }
+
   const { data, error } = await supabase
     .from("requests")
     .select("*")
@@ -113,7 +130,8 @@ export async function getRecentRequests(
     .limit(limit);
 
   if (error) {
-    throw new Error("Failed to load requests");
+    console.error("Failed to load requests:", error);
+    return [];
   }
 
   return (data as RequestRecord[]) || [];
@@ -131,6 +149,11 @@ export async function getRequestsByStatus(
 ): Promise<RequestRecord[]> {
   const supabase = await createServerSupabaseClient();
 
+  if (!supabase) {
+    console.error("Supabase client not available");
+    return [];
+  }
+
   let query = supabase
     .from("requests")
     .select("*")
@@ -144,7 +167,8 @@ export async function getRequestsByStatus(
   const { data, error } = await query;
 
   if (error) {
-    throw new Error("Failed to load requests");
+    console.error("Failed to load requests:", error);
+    return [];
   }
 
   return (data as RequestRecord[]) || [];
@@ -168,6 +192,19 @@ export interface RequestStats {
  */
 export async function getRequestStats(): Promise<RequestStats> {
   const supabase = await createServerSupabaseClient();
+
+  const emptyStats: RequestStats = {
+    all: 0,
+    pending: 0,
+    "in-review": 0,
+    completed: 0,
+    rejected: 0,
+  };
+
+  if (!supabase) {
+    console.error("Supabase client not available");
+    return emptyStats;
+  }
 
   // Try to use the optimized RPC function first (single query)
   const { data: rpcData, error: rpcError } = await supabase.rpc("get_request_stats");
@@ -195,7 +232,8 @@ export async function getRequestStats(): Promise<RequestStats> {
 
   // Check for errors
   if (allResult.error || pendingResult.error || inReviewResult.error || completedResult.error || rejectedResult.error) {
-    throw new Error("Failed to load request statistics");
+    console.error("Failed to load request statistics");
+    return emptyStats;
   }
 
   return {
