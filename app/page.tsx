@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NewsImage } from "@/components/NewsImage";
 import { services } from "@/lib/constants";
-import { getNewsList } from "@/lib/news-service";
+import { getNewsList, type NewsItem } from "@/lib/news-service";
 import { formatNewsDate } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 
@@ -14,7 +14,7 @@ export default async function HomePage() {
   const popularServices = services.slice(0, 4);
   
   // Fetch news with error handling
-  let latestNews = [];
+  let latestNews: NewsItem[] = [];
   try {
     const newsResult = await getNewsList(0, 3);
     latestNews = newsResult.items;
