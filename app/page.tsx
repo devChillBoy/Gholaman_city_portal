@@ -3,25 +3,38 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NewsImage } from "@/components/NewsImage";
 import { services } from "@/lib/constants";
-import { getNewsList, type NewsItem } from "@/lib/news-service";
+import type { NewsItem } from "@/lib/types";
 import { formatNewsDate } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 
-// Revalidate home page every 60 seconds
-export const revalidate = 60;
+// Force dynamic rendering to handle Supabase connection
+export const dynamic = "force-dynamic";
+
+// Helper function to safely fetch news
+async function fetchLatestNews(): Promise<NewsItem[]> {
+  try {
+    // Check if Supabase env vars are available
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.warn("Supabase environment variables not configured");
+      return [];
+    }
+    
+    // Dynamically import to avoid issues during build
+    const { getNewsList } = await import("@/lib/news-service");
+    const newsResult = await getNewsList(0, 3);
+    return newsResult.items;
+  } catch (error) {
+    console.error("Failed to load news:", error);
+    return [];
+  }
+}
 
 export default async function HomePage() {
   const popularServices = services.slice(0, 4);
-  
-  // Fetch news with error handling
-  let latestNews: NewsItem[] = [];
-  try {
-    const newsResult = await getNewsList(0, 3);
-    latestNews = newsResult.items;
-  } catch (error) {
-    // If news fails to load, continue with empty array
-    console.error("Failed to load news:", error);
-  }
+  const latestNews = await fetchLatestNews();
 
   return (
     <div className="flex flex-col">
