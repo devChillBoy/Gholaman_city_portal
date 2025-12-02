@@ -14,13 +14,19 @@ export type AdminNewsItem = NewsItem;
 export async function getAdminNewsList(): Promise<AdminNewsItem[]> {
   const supabase = await createServerSupabaseClient();
 
+  if (!supabase) {
+    console.error("Supabase client not available");
+    return [];
+  }
+
   const { data, error } = await supabase
     .from("news")
     .select("*")
     .order("created_at", { ascending: false });
 
   if (error) {
-    throw new Error("Failed to load admin news list");
+    console.error("Failed to load admin news list:", error);
+    return [];
   }
 
   return (data as AdminNewsItem[]) || [];
@@ -34,6 +40,11 @@ export async function getAdminNewsList(): Promise<AdminNewsItem[]> {
 export async function getAdminNewsById(id: number): Promise<AdminNewsItem | null> {
   const supabase = await createServerSupabaseClient();
 
+  if (!supabase) {
+    console.error("Supabase client not available");
+    return null;
+  }
+
   const { data, error } = await supabase
     .from("news")
     .select("*")
@@ -41,7 +52,8 @@ export async function getAdminNewsById(id: number): Promise<AdminNewsItem | null
     .maybeSingle();
 
   if (error) {
-    throw new Error("Failed to load news item");
+    console.error("Failed to load news item:", error);
+    return null;
   }
 
   return (data as AdminNewsItem) || null;
