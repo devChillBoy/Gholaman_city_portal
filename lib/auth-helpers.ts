@@ -23,6 +23,14 @@ export async function signInEmployee(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = getSupabaseBrowserClient();
+    
+    if (!supabase) {
+      return {
+        success: false,
+        error: "سرویس احراز هویت در دسترس نیست. لطفاً با مدیر سیستم تماس بگیرید.",
+      };
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -54,6 +62,11 @@ export async function signInEmployee(
 export async function getCurrentUser(): Promise<User | null> {
   try {
     const supabase = getSupabaseBrowserClient();
+    
+    if (!supabase) {
+      return null;
+    }
+
     const {
       data: { user },
       error,
@@ -75,5 +88,11 @@ export async function getCurrentUser(): Promise<User | null> {
  */
 export async function signOutEmployee(): Promise<void> {
   const supabase = getSupabaseBrowserClient();
+  
+  if (!supabase) {
+    console.warn("[Auth] Cannot sign out: Supabase client not available");
+    return;
+  }
+
   await supabase.auth.signOut();
 }

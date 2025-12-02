@@ -14,7 +14,17 @@ import type { AppRole } from "./types";
  * List of admin email addresses loaded from environment variable
  * Format: NEXT_PUBLIC_ADMIN_EMAILS=admin@gholaman.ir, boss@gholaman.ir
  */
-const ADMIN_EMAILS: string[] = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
+const adminEmailsEnv = process.env.NEXT_PUBLIC_ADMIN_EMAILS;
+
+// Log warning if admin emails are not configured (only in server context to avoid console spam)
+if (typeof window === "undefined" && !adminEmailsEnv) {
+  console.warn(
+    "[Auth Roles] NEXT_PUBLIC_ADMIN_EMAILS is not set. No users will have admin privileges. " +
+    "Set this environment variable to a comma-separated list of admin email addresses."
+  );
+}
+
+const ADMIN_EMAILS: string[] = (adminEmailsEnv || "")
   .split(",")
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
